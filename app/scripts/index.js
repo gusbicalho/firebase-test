@@ -34,9 +34,9 @@ function basicSetup($rootScope, $state) {
   });
 }
 
-function AppController($rootScope, $state, Firebase, $firebaseObject) {
+function AppController($scope, Firebase, $firebaseObject) {
   console.log('asd',Firebase);
   var ref = new Firebase('https://ekui9ksrrse.firebaseio-demo.com/');
   var AppCtrl = this;
-  this.data = $firebaseObject(ref);
+  $firebaseObject(ref).$bindTo($scope,'AppCtrl.data');
 }
