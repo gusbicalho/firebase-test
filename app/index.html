@@ -1,0 +1,25 @@
+﻿<!DOCTYPE html>
+<html lang="en" ng-app="gb.FirebaseTest" ng-strict-di ng-controller="AppController as AppCtrl">
+  <head>
+    <title>Firebase - AngularFire Test</title>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    
+    <base href="/" />
+
+    <link rel='stylesheet' href='css/app.css' type='text/css'>
+    <script type="text/javascript" src="bundle.js"></script>
+  </head>
+
+  <body>
+    <div ui-view>
+      <h1>Index</h1>
+      <pre>
+        {{AppCtrl.data}}
+      </pre>
+    </div>
+  </body>
+</html>
