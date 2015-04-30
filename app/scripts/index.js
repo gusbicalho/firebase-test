@@ -11,8 +11,8 @@ angular.module('gb.FirebaseTest', [
   .config(config)
   .run(basicSetup)
   .controller('AppController',AppController)
-  .controller('MessagesController',MessagesController)
-  .directive('msgRud',msgRud);
+  .directive('msgRud',msgRud)
+  .directive('fireMsgsCrud',fireMsgsCrud);
 
 var _ = require('lodash');
 
@@ -43,15 +43,41 @@ function AppController($scope, Firebase, $firebaseObject) {
   $firebaseObject(ref).$bindTo($scope,'AppCtrl.data');
 }
 
-function MessagesController($scope, Firebase, $firebaseArray) {
-  var ctrl = this;
+function fireMsgsCrud() {
+  return {
+    restrict: 'EA',
+    scope: {
+      fireUrl: '@',
+    },
+    template: [
+      '<ul>',
+        '<li ng-repeat="msg in ctrl.msgs">',
+          '<msg-rud msgs="ctrl.msgs" msg="msg"></msg-rud>',
+        '</li>',
+      '</ul>',
+      '<form ng-submit="ctrl.send()">',
+        '<input type="text" ng-model="ctrl.msg">',
+      '</form>',
+      ].join(''),
+    controllerAs: 'ctrl',
+    controller: ['$scope','Firebase','$firebaseArray', function($scope, Firebase, $firebaseArray) {
+      var ctrl = this;
+      ctrl.msg = "";
+      ctrl.send = function() {
+        if (!ctrl.msgs.$add)
+          return;
+        ctrl.msgs.$add(ctrl.msg);
+        ctrl.msg = "";
+      };
+      setFirebase($scope.fireUrl);
+      $scope.$watch('fireUrl',setFirebase);
 
-  var ref = new Firebase('https://ekui9ksrrse.firebaseio-demo.com/messages');
-  ctrl.msgs = $firebaseArray(ref);
-  ctrl.msg = "";
-  ctrl.send = function() {
-    ctrl.msgs.$add(ctrl.msg);
-    ctrl.msg = "";
+      function setFirebase(val) {
+        if (!val)
+          return ctrl.msgs = [];
+        ctrl.msgs = $firebaseArray(new Firebase(val));
+      }
+    }]
   };
 }
 

@@ -25,16 +25,7 @@
       spock: <input type="text" ng-model="AppCtrl.data.spock"><br>
       covs: <input type="text" ng-model="AppCtrl.data.covs"><br>
       
-      <div ng-controller="MessagesController as ctrl">
-        <ul>
-          <li ng-repeat="msg in ctrl.msgs">
-            <msg-rud msgs="ctrl.msgs" msg="msg"></msg-rud>
-          </li>
-        </ul>
-        <form ng-submit="ctrl.send()">
-          <input type="text" ng-model="ctrl.msg">
-        </form>
-      </div>
+      <div fire-msgs-crud fire-url="https://ekui9ksrrse.firebaseio-demo.com/messages"></div>
       
     </div>
   </body>
