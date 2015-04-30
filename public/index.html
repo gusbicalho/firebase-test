@@ -3,7 +3,37 @@
 <head>
   <title>Firebase JS Test</title>
   <script src='https://cdn.firebase.com/js/client/2.2.1/firebase.js'></script>
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js'></script>
 </head>
 <body>
+  <ul id="messageList" style="max-height:50%; overflow: auto;">
+  </ul>
+  <input type="text" id="nameInput" placeholder="Name">
+  <input type="text" id="messageInput" placeholder="Message">
+  
+  <script>
+    var myDataRef = new Firebase('https://c058fe3u16x.firebaseio-demo.com/');
+    $('#messageInput').keypress(function (e) {
+      if (e.keyCode == 13) {
+        var name = $('#nameInput').val();
+        var text = $('#messageInput').val();
+        myDataRef.push({name: name, text: text}); 
+        $('#messageInput').val('');
+      }
+    });
+    myDataRef.on('child_added', function(snapshot) {
+      var msg = snapshot.val(), key = snapshot.key();
+      $('#messageList').append($('<li id="msg'+key+'"><strong>'+msg.name+':</strong> '+msg.text+'</li>'));
+    });
+    myDataRef.on('child_changed', function(snapshot) {
+      var msg = snapshot.val(), key = snapshot.key();
+      $('#msg'+key).html('<strong>'+msg.name+':</strong> '+msg.text);
+    });
+    myDataRef.on('child_removed', function(snapshot) {
+      var msg = snapshot.val(), key = snapshot.key();
+      $('#msg'+key).css('text-decoration','line-through');
+      $('#msg'+key).css('opacity','0.6');
+    });
+  </script>
 </body>
 </html>
