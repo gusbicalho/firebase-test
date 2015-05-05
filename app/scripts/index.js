@@ -17,6 +17,7 @@ angular.module('gb.FirebaseTest', [
   .directive('fireMsgsCrud',fireMsgsCrud);
 
 require('./states-email');
+require('./service-auth');
 
 var _ = require('lodash');
 
@@ -43,73 +44,41 @@ function FirebaseRefFactory(Firebase) {
   return new Firebase('https://burning-torch-5101.firebaseio.com/');
 }
 
-function AppController($scope, $state, FirebaseRef, $firebaseAuth, $firebaseObject) {
-  var AppCtrl = this;
-  var auth = $firebaseAuth(FirebaseRef), userObj, unbindUserObj;
+function AppController($scope, $state, FirebaseRef, $firebaseObject, Auth) {
+  var AppCtrl = this, userUnbind;
 
   AppCtrl.emailLogin = function() { $state.go('emailLogin'); };
   AppCtrl.emailSignup = function() { $state.go('emailSignup'); };
   AppCtrl.loginFB = loginFB;
-  AppCtrl.logout = function() { auth.$unauth(); };
-  
-  auth.$onAuth(onAuth);
+  AppCtrl.logout = function() { Auth.logout(); };
+
+  Auth.onAuth(onAuth);
 
   function loginFB() {
-    auth.$authWithOAuthPopup('facebook')
-      .catch(function(reason) {
-        if (reason.code === "TRANSPORT_UNAVAILABLE") {
-          return auth.$authWithOAuthRedirect('facebook');
-        }
-        throw reason;
-      })
-      .catch(function(reason) {
+    Auth.loginFacebook().catch(function(reason) {
         alert(reason.message);
         console.log(reason);
       });
   }
   function onAuth(authData) {
     AppCtrl.authData = authData;
-    if (userObj) {
-      if (!unbindUserObj)
-        throw new Error('Wait for previous login to end!');
-      unbindUserObj();
-      userObj.$destroy();
-      userObj = unbindUserObj = null;
-      delete AppCtrl.user;
-      delete AppCtrl.msgsRef;
-    }
-    if (!authData)
-      return;
-    userObj = $firebaseObject(FirebaseRef.child('accounts').child(authData.uid));
-    userObj.$loaded()
+    Auth.user
       .then(function(userObj) {
-        if (!userObj.provider) {
-          userObj.provider = authData.provider;
-          userObj.name = getName(authData);
-          return userObj.$save().then(function() { return userObj; });
+        if (userUnbind) {
+          userUnbind();
+          userUnbind = null;
         }
-        return userObj;
+        if (!userObj) {
+          delete AppCtrl.msgsRef;
+          return (AppCtrl.user = null);
+        }
+        AppCtrl.msgsRef = userObj.$ref().child('messages').toString();
+        return userObj.$bindTo($scope, 'AppCtrl.user');
       })
-      .then(function(userObj) {
-        return userObj.$bindTo($scope,'AppCtrl.user')
-                .then(function(unbind) {
-                  unbindUserObj = unbind;
-                  AppCtrl.msgsRef = userObj.$ref().child('messages').toString();
-                  return userObj;
-                });
+      .then(function(unbind) {
+        userUnbind = unbind;
       });
   }
-  
-  // find a suitable name based on the meta info given by each provider
-  function getName(authData) {
-    switch(authData.provider) {
-       case 'password':
-         return authData.password.email.replace(/@.*/, '');
-       case 'facebook':
-         return authData.facebook.displayName;
-    }
-  }
-  
 }
 
 function prettyJSONFactory() {

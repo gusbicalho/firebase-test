@@ -30,34 +30,26 @@ function configStates($stateProvider) {
     ;
 }
 
-function EmailLoginController(FirebaseRef, $firebaseAuth, $state) {
+function EmailLoginController(Auth, $state) {
   var ctrl = this;
-  var auth = $firebaseAuth(FirebaseRef);
 
   ctrl.submit = function() {
-    auth.$authWithPassword({
-      email: ctrl.email,
-      password: ctrl.password
-    })
-    .then(function(authData) {
-      $state.go('index');
-    })
-    .catch(function(reason) {
-      alert(reason.message);
-      console.error(reason);
-    });
+    Auth.loginPassword(ctrl.email, ctrl.password)
+      .then(function(authData) {
+        $state.go('index');
+      })
+      .catch(function(reason) {
+        alert(reason.message);
+        console.error(reason);
+      });
   };
 }
 
-function EmailSignupController(FirebaseRef, $firebaseAuth, $state) {
+function EmailSignupController(Auth, $state) {
   var ctrl = this;
-  var auth = $firebaseAuth(FirebaseRef);
 
   ctrl.submit = function() {
-    auth.$createUser({
-      email: ctrl.email,
-      password: ctrl.password
-    })
+    Auth.signupPassword(ctrl.email, ctrl.password)
     .then(function(result) {
       alert('Account created. Now, log in.');
       $state.go('emailLogin');
@@ -69,14 +61,11 @@ function EmailSignupController(FirebaseRef, $firebaseAuth, $state) {
   };
 }
 
-function EmailForgotController(FirebaseRef, $firebaseAuth, $state) {
+function EmailForgotController(Auth, $state) {
   var ctrl = this;
-  var auth = $firebaseAuth(FirebaseRef);
 
   ctrl.submit = function() {
-    auth.$resetPassword({
-      email: ctrl.email,
-    })
+    Auth.forgotPassword(ctrl.email)
     .then(function(result) {
       alert('Password reset e-mail sent. Now, log in using the password in that e-mail.');
       $state.go('emailLogin');
