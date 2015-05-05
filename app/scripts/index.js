@@ -29,8 +29,7 @@ function config($urlProvider, $locationProvider, $stateProvider) {
   });
   $locationProvider.hashPrefix('!');
   $stateProvider
-    .state('index', {
-    });
+    .state('index', {});
 }
 
 basicSetup.$inject = ['$rootScope','$state'];
@@ -44,9 +43,9 @@ function FirebaseRefFactory(Firebase) {
   return new Firebase('https://burning-torch-5101.firebaseio.com/');
 }
 
-function AppController($scope, $state, FirebaseRef, $firebaseAuth) {
+function AppController($scope, $state, FirebaseRef, $firebaseAuth, $firebaseObject) {
   var AppCtrl = this;
-  var auth = $firebaseAuth(FirebaseRef);
+  var auth = $firebaseAuth(FirebaseRef), userObj, unbindUserObj;
 
   AppCtrl.emailLogin = function() { $state.go('emailLogin'); };
   AppCtrl.emailSignup = function() { $state.go('emailSignup'); };
@@ -70,13 +69,60 @@ function AppController($scope, $state, FirebaseRef, $firebaseAuth) {
   }
   function onAuth(authData) {
     AppCtrl.authData = authData;
+    if (userObj) {
+      if (!unbindUserObj)
+        throw new Error('Wait for previous login to end!');
+      unbindUserObj();
+      userObj.$destroy();
+      userObj = unbindUserObj = null;
+      delete AppCtrl.user;
+      delete AppCtrl.msgsRef;
+    }
+    if (!authData)
+      return;
+    userObj = $firebaseObject(FirebaseRef.child('accounts').child(authData.uid));
+    userObj.$loaded()
+      .then(function(userObj) {
+        if (!userObj.provider) {
+          userObj.provider = authData.provider;
+          userObj.name = getName(authData);
+          return userObj.$save().then(function() { return userObj; });
+        }
+        return userObj;
+      })
+      .then(function(userObj) {
+        return userObj.$bindTo($scope,'AppCtrl.user')
+                .then(function(unbind) {
+                  unbindUserObj = unbind;
+                  AppCtrl.msgsRef = userObj.$ref().child('messages').toString();
+                  return userObj;
+                });
+      });
+  }
+  
+  // find a suitable name based on the meta info given by each provider
+  function getName(authData) {
+    switch(authData.provider) {
+       case 'password':
+         return authData.password.email.replace(/@.*/, '');
+       case 'facebook':
+         return authData.facebook.displayName;
+    }
   }
   
 }
 
 function prettyJSONFactory() {
   return function(o) {
-            return JSON.stringify(o,null,'\t');
+            var json;
+            try {
+              json = JSON.stringify(o,null,'\t');
+            } catch(error) {
+              if (error instanceof TypeError)
+                return '[Circular]';
+              throw error;
+            }
+            return json;
          };
 }
 
@@ -97,11 +143,11 @@ function fireMsgsCrud() {
       '</form>',
       ].join(''),
     controllerAs: 'ctrl',
-    controller: ['$scope','Firebase','$firebaseArray', function($scope, Firebase, $firebaseArray) {
+    controller: ['$scope','$timeout','Firebase','$firebaseArray', function($scope, $timeout, Firebase, $firebaseArray) {
       var ctrl = this;
       ctrl.msg = "";
       ctrl.send = function() {
-        if (!ctrl.msgs.$add)
+        if (!ctrl.msgs)
           return;
         ctrl.msgs.$add(ctrl.msg);
         ctrl.msg = "";
@@ -109,9 +155,13 @@ function fireMsgsCrud() {
       setFirebase($scope.fireUrl);
       $scope.$watch('fireUrl',setFirebase);
 
-      function setFirebase(val) {
+      function setFirebase(val,oldVal) {
+        if (ctrl.msgs) {
+          var fa = ctrl.msgs;
+          $timeout(function(){fa.$destroy();});
+        }
         if (!val)
-          return (ctrl.msgs = []);
+          return (delete ctrl.msgs);
         ctrl.msgs = $firebaseArray(new Firebase(val));
       }
     }]

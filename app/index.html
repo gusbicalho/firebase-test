@@ -19,10 +19,19 @@
     <button ng-click="AppCtrl.loginFB()">Login with Facebook</button> |
     <button ng-click="AppCtrl.emailSignup()">Signup with email</button>
     <button ng-click="AppCtrl.emailLogin()">Login with email</button> |
-    <button ng-click="AppCtrl.logout()">Logout</button><br>
+    <button ng-click="AppCtrl.logout()">Logout</button>
+    <br>
     <div ui-view>
       Index
     </div>
+    <div ng-if="AppCtrl.user">
+      <h2>Messages</h2>
+      <div fire-msgs-crud fire-url="{{AppCtrl.msgsRef}}"></div>
+    </div>
+    MsgsRef: {{AppCtrl.msgsRef}}<br>
+    User:<br>
+    <pre>{{AppCtrl.user | prettyJSON}}</pre>
+    AuthData:<br>
     <pre>{{AppCtrl.authData | prettyJSON}}</pre>
   </body>
 </html>

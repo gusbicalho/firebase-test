@@ -78,7 +78,7 @@ function makeWatchify(mainScript, outPath, bundleName) { // Watchify task builde
   bundler.on('update', watchifyBundle); // on any dep update, runs the bundler
   bundler.on('log', gutil.log); // output build logs to terminal
   bundler.transform('browserify-ngannotate',{});
-  bundler.transform('uglifyify',{global: true});
+  //bundler.transform('uglifyify',{global: true});
 
   return watchifyBundle;
 
@@ -86,10 +86,6 @@ function makeWatchify(mainScript, outPath, bundleName) { // Watchify task builde
     return bundler.bundle()
       .on('error', gutil.log.bind(gutil, 'Browserify Error'))
       .pipe(source(bundleName))
-        // sourcemaps
-        .pipe(buffer())
-        .pipe(sourcemaps.init({loadMaps: true})) // loads map from browserify file
-        .pipe(sourcemaps.write('./')) // writes .map file
       // Output it to our dist folder
       .pipe(gulp.dest(outPath));
   }
