@@ -10,9 +10,13 @@ angular.module('gb.FirebaseTest', [
               ])
   .config(config)
   .run(basicSetup)
+  .factory('FirebaseRef',FirebaseRefFactory)
   .controller('AppController',AppController)
+  .filter('prettyJSON',prettyJSONFactory)
   .directive('msgRud',msgRud)
   .directive('fireMsgsCrud',fireMsgsCrud);
+
+require('./states-email');
 
 var _ = require('lodash');
 
@@ -24,6 +28,9 @@ function config($urlProvider, $locationProvider, $stateProvider) {
     requireBase: false
   });
   $locationProvider.hashPrefix('!');
+  $stateProvider
+    .state('index', {
+    });
 }
 
 basicSetup.$inject = ['$rootScope','$state'];
@@ -31,16 +38,46 @@ function basicSetup($rootScope, $state) {
   $rootScope.$on('$stateChangeError',function(event,toState,toParams,fromState,fromParams,error) {
     console.log('$stateChangeError',event,toState,toParams,fromState,fromParams,error);
   });
-  $rootScope.$on('$stateChangeSuccess',function(event,toState,toParams,fromState,fromParams,error) {
-    console.log('$stateChangeSuccess',event,toState,toParams,fromState,fromParams,error);
-  });
 }
 
-function AppController($scope, Firebase, $firebaseObject) {
-  var AppCtrl = this;
+function FirebaseRefFactory(Firebase) {
+  return new Firebase('https://burning-torch-5101.firebaseio.com/');
+}
 
-  var ref = new Firebase('https://ekui9ksrrse.firebaseio-demo.com/');
-  $firebaseObject(ref).$bindTo($scope,'AppCtrl.data');
+function AppController($scope, $state, FirebaseRef, $firebaseAuth) {
+  var AppCtrl = this;
+  var auth = $firebaseAuth(FirebaseRef);
+
+  AppCtrl.emailLogin = function() { $state.go('emailLogin'); };
+  AppCtrl.emailSignup = function() { $state.go('emailSignup'); };
+  AppCtrl.loginFB = loginFB;
+  AppCtrl.logout = function() { auth.$unauth(); };
+  
+  auth.$onAuth(onAuth);
+
+  function loginFB() {
+    auth.$authWithOAuthPopup('facebook')
+      .catch(function(reason) {
+        if (reason.code === "TRANSPORT_UNAVAILABLE") {
+          return auth.$authWithOAuthRedirect('facebook');
+        }
+        throw reason;
+      })
+      .catch(function(reason) {
+        alert(reason.message);
+        console.log(reason);
+      });
+  }
+  function onAuth(authData) {
+    AppCtrl.authData = authData;
+  }
+  
+}
+
+function prettyJSONFactory() {
+  return function(o) {
+            return JSON.stringify(o,null,'\t');
+         };
 }
 
 function fireMsgsCrud() {
@@ -74,7 +111,7 @@ function fireMsgsCrud() {
 
       function setFirebase(val) {
         if (!val)
-          return ctrl.msgs = [];
+          return (ctrl.msgs = []);
         ctrl.msgs = $firebaseArray(new Firebase(val));
       }
     }]

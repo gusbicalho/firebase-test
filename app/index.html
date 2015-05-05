@@ -15,18 +15,14 @@
   </head>
 
   <body>
+    <h1>Login</h1>
+    <button ng-click="AppCtrl.loginFB()">Login with Facebook</button> |
+    <button ng-click="AppCtrl.emailSignup()">Signup with email</button>
+    <button ng-click="AppCtrl.emailLogin()">Login with email</button> |
+    <button ng-click="AppCtrl.logout()">Logout</button><br>
     <div ui-view>
-      <h1>Index</h1>
-      <pre>
-        {{AppCtrl.data}}
-      </pre>
-      test: <input type="text" ng-model="AppCtrl.data.test"><br>
-      snap: <input type="text" ng-model="AppCtrl.data.snap"><br>
-      spock: <input type="text" ng-model="AppCtrl.data.spock"><br>
-      covs: <input type="text" ng-model="AppCtrl.data.covs"><br>
-      
-      <div fire-msgs-crud fire-url="https://ekui9ksrrse.firebaseio-demo.com/messages"></div>
-      
+      Index
     </div>
+    <pre>{{AppCtrl.authData | prettyJSON}}</pre>
   </body>
 </html>
