@@ -16,8 +16,8 @@ angular.module('gb.FirebaseTest', [
   .directive('msgRud',msgRud)
   .directive('fireMsgsCrud',fireMsgsCrud);
 
-require('./states-email');
 require('./service-auth');
+require('./states-email');
 
 var _ = require('lodash');
 
@@ -85,7 +85,7 @@ function prettyJSONFactory() {
   return function(o) {
             var json;
             try {
-              json = JSON.stringify(o,null,'\t');
+              json = JSON.stringify(o,null,'  ');
             } catch(error) {
               if (error instanceof TypeError)
                 return '[Circular]';
@@ -108,7 +108,7 @@ function fireMsgsCrud() {
         '</li>',
       '</ul>',
       '<form ng-submit="ctrl.send()">',
-        '<input type="text" ng-model="ctrl.msg">',
+        '<input type="text" ng-model="ctrl.msg" ng-disabled="!ctrl.msgs">',
       '</form>',
       ].join(''),
     controllerAs: 'ctrl',

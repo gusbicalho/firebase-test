@@ -12,8 +12,8 @@ function AuthFactory(FirebaseRef, $firebaseAuth, $firebaseObject, $state, $rootS
   
   return {
     get user() { return user; },
-    get requireAuth() { return auth.requireAuth(); },
-    get waitForAuth() { return auth.waitForAuth(); },
+    get requireAuth() { return function() { return auth.requireAuth(); }; },
+    get waitForAuth() { return function() { return auth.waitForAuth(); }; },
     get onAuth() { return function(fn) { return auth.$onAuth(fn); }; },
     get loginFacebook() { return loginFB; },
     get loginPassword() { return loginPassword; },

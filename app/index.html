@@ -21,8 +21,9 @@
     <button ng-click="AppCtrl.emailLogin()">Login with email</button> |
     <button ng-click="AppCtrl.logout()">Logout</button>
     <br>
-    <div ui-view>
-      Index
+    <a href ui-sref="index">Index</a>
+    <div ui-view style="border: 1px solid black">
+      <h2>Index</h2>
     </div>
     <div ng-if="AppCtrl.user">
       <h2>Messages</h2>
