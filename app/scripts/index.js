@@ -16,8 +16,9 @@ angular.module('gb.FirebaseTest', [
   .directive('msgRud',msgRud)
   .directive('fireMsgsCrud',fireMsgsCrud);
 
-require('./states-email');
 require('./service-auth');
+require('./states-email');
+require('./states-account');
 
 var _ = require('lodash');
 
@@ -45,7 +46,7 @@ function FirebaseRefFactory(Firebase) {
 }
 
 function AppController($scope, $state, FirebaseRef, $firebaseObject, Auth) {
-  var AppCtrl = this, userUnbind;
+  var AppCtrl = this;
 
   AppCtrl.emailLogin = function() { $state.go('emailLogin'); };
   AppCtrl.emailSignup = function() { $state.go('emailSignup'); };
@@ -64,20 +65,15 @@ function AppController($scope, $state, FirebaseRef, $firebaseObject, Auth) {
     AppCtrl.authData = authData;
     Auth.user
       .then(function(userObj) {
-        if (userUnbind) {
-          userUnbind();
-          userUnbind = null;
-        }
         if (!userObj) {
           delete AppCtrl.msgsRef;
-          return (AppCtrl.user = null);
+          return;
         }
-        AppCtrl.msgsRef = userObj.$ref().child('messages').toString();
-        return userObj.$bindTo($scope, 'AppCtrl.user');
+        AppCtrl.msgsRef =
+          userObj.accountId?
+            FirebaseRef.child('accounts').child(userObj.accountId).child('messages').toString():
+            null;
       })
-      .then(function(unbind) {
-        userUnbind = unbind;
-      });
   }
 }
 
@@ -85,7 +81,7 @@ function prettyJSONFactory() {
   return function(o) {
             var json;
             try {
-              json = JSON.stringify(o,null,'\t');
+              json = JSON.stringify(o,null,'  ');
             } catch(error) {
               if (error instanceof TypeError)
                 return '[Circular]';
@@ -108,7 +104,7 @@ function fireMsgsCrud() {
         '</li>',
       '</ul>',
       '<form ng-submit="ctrl.send()">',
-        '<input type="text" ng-model="ctrl.msg">',
+        '<input type="text" ng-model="ctrl.msg" ng-disabled="!ctrl.msgs">',
       '</form>',
       ].join(''),
     controllerAs: 'ctrl',

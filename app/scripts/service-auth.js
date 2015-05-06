@@ -12,8 +12,8 @@ function AuthFactory(FirebaseRef, $firebaseAuth, $firebaseObject, $state, $rootS
   
   return {
     get user() { return user; },
-    get requireAuth() { return auth.requireAuth(); },
-    get waitForAuth() { return auth.waitForAuth(); },
+    get requireAuth() { return function() { return auth.$requireAuth(); }; },
+    get waitForAuth() { return function() { return auth.$waitForAuth(); }; },
     get onAuth() { return function(fn) { return auth.$onAuth(fn); }; },
     get loginFacebook() { return loginFB; },
     get loginPassword() { return loginPassword; },
@@ -52,30 +52,22 @@ function AuthFactory(FirebaseRef, $firebaseAuth, $firebaseObject, $state, $rootS
   function onAuth(authData) {
     if (user)
       user.finally(function(userObj) {
-        if (userObj) userObj.$destroy();
+        if (userObj)
+          userObj.$destroy();
       });
     if (!authData)
       return (user = $q(function(resolve,reject) { resolve(null); }));
     user =
-      $firebaseObject(FirebaseRef.child('accounts').child(authData.uid))
+      $firebaseObject(FirebaseRef.child('userToAccount').child(authData.uid))
         .$loaded()
-        .then(function(userObj) {
-          if (!userObj.provider) {
-            userObj.provider = authData.provider;
-            userObj.name = getName(authData);
-            return userObj.$save().then(function() { return userObj; });
+        .then(function(loginObj) {
+          if (!loginObj.provider) {
+            loginObj.provider = authData.provider;
+            loginObj.accountId = null;
+            return loginObj.$save().then(function() { return loginObj; });
           }
-          return userObj;
+          return loginObj;
         });
   }
 
-  // find a suitable name based on the meta info given by each provider
-  function getName(authData) {
-    switch(authData.provider) {
-       case 'password':
-         return authData.password.email.replace(/@.*/, '');
-       case 'facebook':
-         return authData.facebook.displayName;
-    }
-  }
 }
