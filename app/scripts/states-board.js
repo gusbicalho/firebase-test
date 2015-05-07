@@ -63,17 +63,6 @@ function BoardController(FirebaseRef, Auth, authData, $state, $q) {
       });
     })
     .then(function(newPostRef) {
-      return $q(function(res,rej) {
-        FirebaseRef.child('board/')
-          .child(post.parent ? 'posts/'+post.parent+'/answers/' : 'rootPosts/')
-          .child(newPostRef.key())
-          .set(true, function(error) {
-            if (error) return rej(error);
-            res(newPostRef);
-          });
-      });
-    })
-    .then(function(newPostRef) {
       success(newPostRef);
     })
     .catch(function(reason) {
@@ -85,52 +74,16 @@ function BoardController(FirebaseRef, Auth, authData, $state, $q) {
   }
 }
 
-function IndexController(Firebase, FirebaseRef, authData, $scope, $q) {
+function IndexController(Firebase, FirebaseRef, authData, $firebaseArray, $scope) {
   var indexCtrl = this;
   
-  indexCtrl.boardPosts = [];
+  indexCtrl.boardPosts = $firebaseArray(FirebaseRef.child('board/posts').orderByChild('parent').equalTo(null));
   indexCtrl.newPost = {};
   indexCtrl.submitNew = submitNew;
 
-  var rootPostsRef = FirebaseRef.child('board/rootPosts');
-  rootPostsRef.on('child_added',postAdded);
-  rootPostsRef.on('child_removed',postRemoved);
   $scope.$on('$destroy',function(event) {
-    rootPostsRef.off('child_added',postAdded);
-    rootPostsRef.off('child_removed',postRemoved);
+    indexCtrl.boardPosts.$destroy();
   });
-
-  function postAdded(data, prev) {
-    $scope.$applyAsync(function() {
-      var i = prev ?
-                1 + _.findIndex(indexCtrl.boardPosts, function(post) { return post.key === prev; }):
-                indexCtrl.boardPosts.length;
-      var post = {
-        key: data.key(),
-        data: null,
-        ref: FirebaseRef.child('board/posts').child(data.key()),
-        onValue: function(data) {
-          $scope.$applyAsync(function() { post.data = data.val(); });
-        }
-      };
-      post.ref.on('value',post.onValue);
-      $scope.$on('$destroy',function(event) {
-        post.ref.off('value',post.onValue);
-      });
-      indexCtrl.boardPosts.splice(i,0,post);
-    });
-  }
-
-  function postRemoved(data) {
-    $scope.$applyAsync(function() {
-      var i = _.findIndex(indexCtrl.boardPosts, function(post) { return post.key === data.key(); });
-      if (1 >= 0) {
-        var post = indexCtrl.boardPosts[i];
-        post.ref.off('value',post.onValue);
-        indexCtrl.boardPosts.splice(i,1);
-      }
-    });
-  }
 
   function submitNew(parent) {
     if (indexCtrl.submittingNew) return;
@@ -152,32 +105,29 @@ function IndexController(Firebase, FirebaseRef, authData, $scope, $q) {
   }
 }
 
-function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
+function PostController(Firebase, FirebaseRef, authData, $firebaseArray, $scope, $q, $state) {
   var postCtrl = this;
   var postId = $state.params.postId;
   var postRef = FirebaseRef.child('board/posts').child(postId);
   
-  postCtrl.answers = [];
   postCtrl.canEdit = function() { return authData && postCtrl.post.author && postCtrl.post.author === authData.uid; };
   postCtrl.editText = "";
   postCtrl.newAnswer = {};
   postCtrl.post = {};
   postCtrl.saveEdit = saveEdit;
   postCtrl.submitAnswer = submitAnswer;
+  postCtrl.answers = $firebaseArray(FirebaseRef.child('board/posts').orderByChild('parent').equalTo(postId));
+
+  $scope.$on('$destroy',function(event) {
+    postCtrl.answers.$destroy();
+  });
   
   postRef.on('value',postValue);
   $scope.$on('$destroy',function(event) {
     postRef.off('value',postValue);
   });
 
-  var answersRef = postRef.child('answers');
-  answersRef.on('child_added',answerAdded);
-  answersRef.on('child_removed',answerRemoved);
-  $scope.$on('$destroy',function(event) {
-    answersRef.off('child_added',answerAdded);
-    answersRef.off('child_removed',answerRemoved);
-  });
-
+  
   function postValue(data) {
     $scope.$applyAsync(function() {
       var post = data.val();
@@ -190,39 +140,7 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
       postCtrl.postLoaded = true;
     });
   }
-
-  function answerAdded(data, prev) {
-    $scope.$applyAsync(function() {
-      var i = prev ?
-                1 + _.findIndex(postCtrl.answers, function(post) { return post.key === prev; }):
-                postCtrl.answers.length;
-      var post = {
-        key: data.key(),
-        data: null,
-        ref: FirebaseRef.child('board/posts').child(data.key()),
-        onValue: function(data) {
-          $scope.$applyAsync(function() { post.data = data.val(); });
-        }
-      };
-      post.ref.on('value',post.onValue);
-      $scope.$on('$destroy',function(event) {
-        post.ref.off('value',post.onValue);
-      });
-      postCtrl.answers.splice(i,0,post);
-    });
-  }
-
-  function answerRemoved(data) {
-    $scope.$applyAsync(function() {
-      var i = _.findIndex(postCtrl.answers, function(post) { return post.key === data.key(); });
-      if (1 >= 0) {
-        var post = postCtrl.answers[i];
-        post.ref.off('value',post.onValue);
-        postCtrl.answers.splice(i,1);
-      }
-    });
-  }
-  
+ 
   function saveEdit() {
     postCtrl.savingEdit = true;
     var edit = {
@@ -263,7 +181,7 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
       },
       function() { // after
         postCtrl.submittingAnswer = false;
-      })
+      });
   }
 }
 
@@ -287,7 +205,7 @@ var INDEX_TEMPLATE = [
   '<h4>Posts</h4>',
   '<ul>',
     '<li ng-repeat="post in indexCtrl.boardPosts">',
-      '<a ui-sref="board.post({postId:post.key})">@{{post.data.author}}: {{post.data.title}}</a>',
+        '<a ui-sref="board.post({postId:post.$id})">@{{post.author}}: {{post.title}}</a>',
     '</li>',
   '</ul>',
   ].join('');
@@ -325,9 +243,8 @@ var POST_TEMPLATE = [
     '<h4>Answers</h4>',
     '<ul>',
       '<li ng-repeat="post in postCtrl.answers">',
-        '<a ui-sref="board.post({postId:post.key})">@{{post.data.author}}: {{post.data.title}}</a>',
+        '<a ui-sref="board.post({postId:post.$id})">@{{post.author}}: {{post.title}}</a>',
       '</li>',
     '</ul>',
-    '<pre>{{postCtrl.post | prettyJSON}}</pre>',
   '</div>',
   ].join('');
