@@ -6,7 +6,8 @@ require('angularfire/node_modules/firebase');
 
 angular.module('gb.FirebaseTest', [
                 require('./ui-router-resolving'),
-                require('angularfire')
+                require('angularfire'),
+                require('gb-overlay')
               ])
   .config(config)
   .run(basicSetup)

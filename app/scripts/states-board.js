@@ -9,20 +9,21 @@ function configStates($stateProvider) {
   $stateProvider
     .state('board', {
       url: '/board',
-      template: INDEX_TEMPLATE,
+      template: BOARD_TEMPLATE,
       resolve: {
-        User: ['Auth', function(Auth) {
-          return Auth.getUser();
-        }],
-        authData: ['Auth', function(Auth) {
+        authData: function(Auth) {
           return Auth.waitForAuth();
-        }]
+        }
       },
-      onExit: ['User',function(User) {
-        User.$destroy();
-      }],
       controller: BoardController,
       controllerAs: 'ctrl'
+    })
+    .state('board.index', {
+      url: '',
+      template: INDEX_TEMPLATE,
+      resolve: {},
+      controller: IndexController,
+      controllerAs: 'indexCtrl'
     })
     .state('board.post', {
       url: '/:postId',
@@ -34,20 +35,24 @@ function configStates($stateProvider) {
     ;
 }
 
-function BoardController(Firebase, FirebaseRef, Auth, User, authData, $scope, $q, $scope) {
+function BoardController(Auth, authData, $state) {
   var ctrl = this;
-
-  ctrl.boardPosts = [];
-  ctrl.newPost = {};
-  ctrl.submitNew = submitNew;
 
   var offAuth = Auth.onAuth(function(newAuthData) {
     if ((!!newAuthData !== !!authData) ||
         (newAuthData && authData && newAuthData.uid !== authData.uid)) {
       offAuth();
-      $state.reload('user');
+      $state.reload('board');
     }
   });
+}
+
+function IndexController(Firebase, FirebaseRef, authData, $scope, $q) {
+  var indexCtrl = this;
+  
+  indexCtrl.boardPosts = [];
+  indexCtrl.newPost = {};
+  indexCtrl.submitNew = submitNew;
 
   var rootPostsRef = FirebaseRef.child('board/rootPosts');
   rootPostsRef.on('child_added',postAdded);
@@ -60,9 +65,8 @@ function BoardController(Firebase, FirebaseRef, Auth, User, authData, $scope, $q
   function postAdded(data, prev) {
     $scope.$applyAsync(function() {
       var i = prev ?
-                1 + _.findIndex(ctrl.boardPosts, function(post) { return post.key === prev; }):
-                ctrl.boardPosts.length;
-      console.log('added',ctrl.boardPosts,data.key(),prev,i);
+                1 + _.findIndex(indexCtrl.boardPosts, function(post) { return post.key === prev; }):
+                indexCtrl.boardPosts.length;
       var post = {
         key: data.key(),
         data: null,
@@ -75,31 +79,31 @@ function BoardController(Firebase, FirebaseRef, Auth, User, authData, $scope, $q
       $scope.$on('$destroy',function(event) {
         post.ref.off('value',post.onValue);
       });
-      ctrl.boardPosts.splice(i,0,post);
+      indexCtrl.boardPosts.splice(i,0,post);
     });
   }
 
   function postRemoved(data) {
     $scope.$applyAsync(function() {
-      var i = _.findIndex(ctrl.boardPosts, function(post) { return post.key === data.key(); });
+      var i = _.findIndex(indexCtrl.boardPosts, function(post) { return post.key === data.key(); });
       if (1 >= 0) {
-        var post = ctrl.boardPosts[i];
+        var post = indexCtrl.boardPosts[i];
         post.ref.off('value',post.onValue);
-        ctrl.boardPosts.splice(i,1);
+        indexCtrl.boardPosts.splice(i,1);
       }
     });
   }
 
   function submitNew(parent) {
-    if (!User || ctrl.submittingNew) return;
-    console.log(ctrl.newPost);
-    ctrl.submittingNew = true;
-    ctrl.newPost.author = authData.uid;
-    ctrl.newPost.timestamp = Firebase.ServerValue.TIMESTAMP;
+    if (!authData || indexCtrl.submittingNew) return;
+    console.log(indexCtrl.newPost);
+    indexCtrl.submittingNew = true;
+    indexCtrl.newPost.author = authData.uid;
+    indexCtrl.newPost.timestamp = Firebase.ServerValue.TIMESTAMP;
     if (parent)
-      ctrl.newPost.parent = parent;
+      indexCtrl.newPost.parent = parent;
     $q(function(res,rej) {
-      var newPostRef = FirebaseRef.child('board/posts').push(ctrl.newPost, function(error) {
+      var newPostRef = FirebaseRef.child('board/posts').push(indexCtrl.newPost, function(error) {
         if (error) return rej(error);
         res(newPostRef);
       });
@@ -113,43 +117,116 @@ function BoardController(Firebase, FirebaseRef, Auth, User, authData, $scope, $q
       });
     })
     .then(function(newPostRef) {
-      ctrl.newPost = {};
+      indexCtrl.newPost = {};
     })
     .catch(function(error) {
       alert(error.message);
       console.log(error);
     })
     .finally(function() {
-      ctrl.submittingNew = false;
+      indexCtrl.submittingNew = false;
     });
   }
 }
 
-function PostController() {
+function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
+  var postCtrl = this;
+  var postId = $state.params.postId;
+  var postRef = FirebaseRef.child('board/posts').child(postId);
+  
+  postCtrl.canEdit = function() { return postCtrl.post.author && postCtrl.post.author === authData.uid; };
+  postCtrl.editText = "";
+  postCtrl.post = {};
+  postCtrl.saveEdit = saveEdit;
+  
+  postRef.on('value',postValue);
+  $scope.$on('$destroy',function(event) {
+    postRef.off('value',postValue);
+  });
+  
+  function postValue(data) {
+    $scope.$applyAsync(function() {
+      var post = data.val();
+      post.currentContent =
+        !post.edits? post.text:
+        _.keys(post.edits).length === 0? post.text:
+          _(post.edits).values().max('timestamp');
+      postCtrl.post = post;
+      postCtrl.postLoaded = true;
+    });
+  }
+  
+  function saveEdit() {
+    postCtrl.savingEdit = true;
+    var edit = {
+      text: postCtrl.editText,
+      timestamp: Firebase.ServerValue.TIMESTAMP
+    };
+    $q(function(res,rej) {
+      var newEditRef = postRef.child('edits').push(edit, function(error) {
+        if (error) return rej(error); res(newEditRef);
+      });
+    })
+    .then(function(newEditRef) {
+      postCtrl.editText = "";
+    })
+    .catch(function(error) {
+      alert(error.message);
+      console.log(error);
+    })
+    .finally(function() {
+      postCtrl.savingEdit = false;
+    });
+  }
+  
 }
 
-var INDEX_TEMPLATE = [
+var BOARD_TEMPLATE = [
   '<h2>Board</h2>',
-  '<a ui-sref="board">Back to Root</a>',
-  '<div ui-view>',
-    '<h3>Root</h3>',
-    '<form ng-submit="ctrl.submitNew()" ng-disabled="!User" style="position:relative;margin:0.5em;padding:0.5em;border:1px solid #AAA">',
-      '<gb-overlay condition="ctrl.submittingNew"></gb-overlay>',
-      '<h3>New post</h3>',
-      'Title: <input ng-model="ctrl.newPost.title"><br>',
-      'Text:<br>',
-      '<textarea ng-model="ctrl.newPost.text"></textarea>',
-      '<br>',
-      '<button type="submit">Submit</button>',
-    '</form>',
-    '<ul>',
-      '<li ng-repeat="post in ctrl.boardPosts">',
-        '<a ui-sref="board.post({postId:post.key})">{{post.data.title}}</a>',
-      '</li>',
-    '</ul>',
-  '</div>',
+  '<a ui-sref="board.index">Back to Root</a>',
+  '<div ui-view></div>',
+  ].join('');
+
+var INDEX_TEMPLATE = [
+  '<h3>Root</h3>',
+  '<form ng-submit="indexCtrl.submitNew()" ng-if="User" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+    '<gb-overlay condition="indexCtrl.submittingNew"></gb-overlay>',
+    '<h4>New post</h4>',
+    'Title: <input ng-model="indexCtrl.newPost.title"><br>',
+    'Text:<br>',
+    '<textarea ng-model="indexCtrl.newPost.text"></textarea>',
+    '<br>',
+    '<button type="submit">Submit</button>',
+  '</form>',
+  '<h4>Posts</h4>',
+  '<ul>',
+    '<li ng-repeat="post in indexCtrl.boardPosts">',
+      '<a ui-sref="board.post({postId:post.key})">@{{post.data.author}}: {{post.data.title}}</a>',
+    '</li>',
+  '</ul>',
   ].join('');
 
 var POST_TEMPLATE = [
-  '<h3>Post</h3>',
+  '<div ng-if="postCtrl.postLoaded">',
+    '<h3>',
+      '{{postCtrl.post.title}} ',
+      '<small ng-if="postCtrl.parent"><a ui-sref="board.post({postId:post.parent})">Go to Parent</a> </small>',
+      '<small>by {{postCtrl.post.author}}</small>',
+    '</h3>',
+    '<div class="post-date" style="font-style:italic">',
+      'Posted on {{postCtrl.post.timestamp | date:"medium"}}',
+      '<span ng-if="postCtrl.post.timestamp != postCtrl.post.currentContent.timestamp">',
+        ', last edit on {{postCtrl.post.currentContent.timestamp | date:"medium"}}',
+      '</span>',
+    '</div>',
+    '<p>{{postCtrl.post.currentContent.text}}</p>',
+    '<form ng-if="postCtrl.canEdit()" ng-submit="postCtrl.saveEdit()" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+      '<gb-overlay condition="indexCtrl.savingEdit"></gb-overlay>',
+      '<h4>Edit text</h4>',
+      '<textarea ng-model="postCtrl.editText"></textarea>',
+      '<br>',
+      '<button type="submit">Save</button>',
+    '</form>',
+    '<pre>{{postCtrl.post | prettyJSON}}</pre>',
+  '</div>',
   ].join('');
