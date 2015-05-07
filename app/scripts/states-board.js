@@ -157,6 +157,7 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
   var postId = $state.params.postId;
   var postRef = FirebaseRef.child('board/posts').child(postId);
   
+  postCtrl.answers = [];
   postCtrl.canEdit = function() { return authData && postCtrl.post.author && postCtrl.post.author === authData.uid; };
   postCtrl.editText = "";
   postCtrl.newAnswer = {};
@@ -168,7 +169,15 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
   $scope.$on('$destroy',function(event) {
     postRef.off('value',postValue);
   });
-  
+
+  var answersRef = postRef.child('answers');
+  answersRef.on('child_added',answerAdded);
+  answersRef.on('child_removed',answerRemoved);
+  $scope.$on('$destroy',function(event) {
+    answersRef.off('child_added',answerAdded);
+    answersRef.off('child_removed',answerRemoved);
+  });
+
   function postValue(data) {
     $scope.$applyAsync(function() {
       var post = data.val();
@@ -179,6 +188,38 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
           _(post.edits).values().max('timestamp');
       postCtrl.post = post;
       postCtrl.postLoaded = true;
+    });
+  }
+
+  function answerAdded(data, prev) {
+    $scope.$applyAsync(function() {
+      var i = prev ?
+                1 + _.findIndex(postCtrl.answers, function(post) { return post.key === prev; }):
+                postCtrl.answers.length;
+      var post = {
+        key: data.key(),
+        data: null,
+        ref: FirebaseRef.child('board/posts').child(data.key()),
+        onValue: function(data) {
+          $scope.$applyAsync(function() { post.data = data.val(); });
+        }
+      };
+      post.ref.on('value',post.onValue);
+      $scope.$on('$destroy',function(event) {
+        post.ref.off('value',post.onValue);
+      });
+      postCtrl.answers.splice(i,0,post);
+    });
+  }
+
+  function answerRemoved(data) {
+    $scope.$applyAsync(function() {
+      var i = _.findIndex(postCtrl.answers, function(post) { return post.key === data.key(); });
+      if (1 >= 0) {
+        var post = postCtrl.answers[i];
+        post.ref.off('value',post.onValue);
+        postCtrl.answers.splice(i,1);
+      }
     });
   }
   
@@ -281,6 +322,12 @@ var POST_TEMPLATE = [
       '<br>',
       '<button type="submit">Submit</button>',
     '</form>',
+    '<h4>Answers</h4>',
+    '<ul>',
+      '<li ng-repeat="post in postCtrl.answers">',
+        '<a ui-sref="board.post({postId:post.key})">@{{post.data.author}}: {{post.data.title}}</a>',
+      '</li>',
+    '</ul>',
     '<pre>{{postCtrl.post | prettyJSON}}</pre>',
   '</div>',
   ].join('');
