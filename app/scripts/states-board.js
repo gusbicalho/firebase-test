@@ -35,10 +35,12 @@ function configStates($stateProvider) {
     ;
 }
 
-function BoardController(Auth, authData, $state) {
+function BoardController(FirebaseRef, Auth, authData, $state, $q) {
   var ctrl = this;
 
   ctrl.auth = authData;
+  ctrl.submitPost = submitPost;
+
   var offAuth = Auth.onAuth(function(newAuthData) {
     if ((!!newAuthData !== !!authData) ||
         (newAuthData && authData && newAuthData.uid !== authData.uid)) {
@@ -46,6 +48,41 @@ function BoardController(Auth, authData, $state) {
       $state.reload('board');
     }
   });
+  
+  function submitPost(post, before, success, error, after) {
+    if (!authData) return;
+    console.log('submitPost',post);
+    before();
+    post = _.cloneDeep(post);
+    post.author = authData.uid;
+    post.timestamp = Firebase.ServerValue.TIMESTAMP;
+    $q(function(res,rej) {
+      var newPostRef = FirebaseRef.child('board/posts').push(post, function(error) {
+        if (error) return rej(error);
+        res(newPostRef);
+      });
+    })
+    .then(function(newPostRef) {
+      return $q(function(res,rej) {
+        FirebaseRef.child('board/')
+          .child(post.parent ? 'posts/'+post.parent+'/answers/' : 'rootPosts/')
+          .child(newPostRef.key())
+          .set(true, function(error) {
+            if (error) return rej(error);
+            res(newPostRef);
+          });
+      });
+    })
+    .then(function(newPostRef) {
+      success(newPostRef);
+    })
+    .catch(function(reason) {
+      error(reason);
+    })
+    .finally(function() {
+      after();
+    });
+  }
 }
 
 function IndexController(Firebase, FirebaseRef, authData, $scope, $q) {
@@ -96,37 +133,22 @@ function IndexController(Firebase, FirebaseRef, authData, $scope, $q) {
   }
 
   function submitNew(parent) {
-    if (!authData || indexCtrl.submittingNew) return;
-    console.log(indexCtrl.newPost);
-    indexCtrl.submittingNew = true;
-    indexCtrl.newPost.author = authData.uid;
-    indexCtrl.newPost.timestamp = Firebase.ServerValue.TIMESTAMP;
-    if (parent)
-      indexCtrl.newPost.parent = parent;
-    $q(function(res,rej) {
-      var newPostRef = FirebaseRef.child('board/posts').push(indexCtrl.newPost, function(error) {
-        if (error) return rej(error);
-        res(newPostRef);
-      });
-    })
-    .then(function(newPostRef) {
-      return $q(function(res,rej) {
-        FirebaseRef.child('board/rootPosts/'+newPostRef.key()).set(true, function(error) {
-          if (error) return rej(error);
-          res(newPostRef);
-        });
-      });
-    })
-    .then(function(newPostRef) {
-      indexCtrl.newPost = {};
-    })
-    .catch(function(error) {
-      alert(error.message);
-      console.log(error);
-    })
-    .finally(function() {
-      indexCtrl.submittingNew = false;
-    });
+    if (indexCtrl.submittingNew) return;
+    $scope.ctrl.submitPost(indexCtrl.newPost,
+      function() { // before
+        indexCtrl.submittingNew = true;
+      },
+      function(answerRef) { // success
+        indexCtrl.newPost = {};
+        console.log('Post submitted!');
+      },
+      function(error) { // error
+        alert(error.message);
+        console.log(error);
+      },
+      function() { // after
+        indexCtrl.submittingNew = false;
+      })
   }
 }
 
@@ -135,10 +157,12 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
   var postId = $state.params.postId;
   var postRef = FirebaseRef.child('board/posts').child(postId);
   
-  postCtrl.canEdit = function() { return postCtrl.post.author && postCtrl.post.author === authData.uid; };
+  postCtrl.canEdit = function() { return authData && postCtrl.post.author && postCtrl.post.author === authData.uid; };
   postCtrl.editText = "";
+  postCtrl.newAnswer = {};
   postCtrl.post = {};
   postCtrl.saveEdit = saveEdit;
+  postCtrl.submitAnswer = submitAnswer;
   
   postRef.on('value',postValue);
   $scope.$on('$destroy',function(event) {
@@ -148,6 +172,7 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
   function postValue(data) {
     $scope.$applyAsync(function() {
       var post = data.val();
+      post.key = data.key();
       post.currentContent =
         !post.edits? {text: post.text}:
         _.keys(post.edits).length === 0? post.text:
@@ -180,6 +205,25 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
     });
   }
   
+  function submitAnswer() {
+    if (!postCtrl.postLoaded || postCtrl.submittingAnswer) return;
+    postCtrl.newAnswer.parent = postCtrl.post.key;
+    $scope.ctrl.submitPost(postCtrl.newAnswer,
+      function() { // before
+        postCtrl.submittingAnswer = true;
+      },
+      function(answerRef) { // success
+        postCtrl.newAnswer = {};
+        console.log('answer submitted!');
+      },
+      function(error) { // error
+        alert(error.message);
+        console.log(error);
+      },
+      function() { // after
+        postCtrl.submittingAnswer = false;
+      })
+  }
 }
 
 var BOARD_TEMPLATE = [
@@ -227,6 +271,15 @@ var POST_TEMPLATE = [
       '<textarea ng-model="postCtrl.editText"></textarea>',
       '<br>',
       '<button type="submit">Save</button>',
+    '</form>',
+    '<form ng-submit="postCtrl.submitAnswer()" ng-if="ctrl.auth" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+      '<gb-overlay condition="postCtrl.submittingAnswer"></gb-overlay>',
+      '<h4>Answer</h4>',
+      'Title: <input ng-model="postCtrl.newAnswer.title"><br>',
+      'Text:<br>',
+      '<textarea ng-model="postCtrl.newAnswer.text"></textarea>',
+      '<br>',
+      '<button type="submit">Submit</button>',
     '</form>',
     '<pre>{{postCtrl.post | prettyJSON}}</pre>',
   '</div>',
