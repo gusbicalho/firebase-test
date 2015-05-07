@@ -117,30 +117,30 @@ function PostController(Firebase, FirebaseRef, authData, $firebaseArray, $scope,
   postCtrl.saveEdit = saveEdit;
   postCtrl.submitAnswer = submitAnswer;
   postCtrl.answers = $firebaseArray(FirebaseRef.child('board/posts').orderByChild('parent').equalTo(postId));
+  postCtrl.edits = $firebaseArray(postRef.child('edits'));
+  postCtrl.currentContent = currentContent;
 
   $scope.$on('$destroy',function(event) {
     postCtrl.answers.$destroy();
+    postCtrl.edits.$destroy();
   });
   
-  postRef.on('value',postValue);
-  $scope.$on('$destroy',function(event) {
-    postRef.off('value',postValue);
-  });
-
-  
-  function postValue(data) {
+  postRef.once('value', function(data) {
     $scope.$applyAsync(function() {
       var post = data.val();
       post.key = data.key();
-      post.currentContent =
-        !post.edits? {text: post.text}:
-        _.keys(post.edits).length === 0? post.text:
-          _(post.edits).values().max('timestamp');
+      delete post.edits;
       postCtrl.post = post;
       postCtrl.postLoaded = true;
     });
+  })
+
+  function currentContent() {
+    return postCtrl.edits.length > 0?
+              _(postCtrl.edits).values().max('timestamp'):
+              postCtrl.post;
   }
- 
+
   function saveEdit() {
     postCtrl.savingEdit = true;
     var edit = {
@@ -219,11 +219,11 @@ var POST_TEMPLATE = [
     '</h3>',
     '<div class="post-date" style="font-style:italic">',
       'Posted on {{postCtrl.post.timestamp | date:"medium"}}',
-      '<span ng-if="postCtrl.post.currentContent.timestamp">',
-        ', last edit on {{postCtrl.post.currentContent.timestamp | date:"medium"}}',
+      '<span ng-if="postCtrl.currentContent() !== postCtrl.post">',
+        ', last edit on {{postCtrl.currentContent().timestamp | date:"medium"}}',
       '</span>',
     '</div>',
-    '<p>{{postCtrl.post.currentContent.text}}</p>',
+    '<p>{{postCtrl.currentContent().text}}</p>',
     '<form ng-if="postCtrl.canEdit()" ng-submit="postCtrl.saveEdit()" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
       '<gb-overlay condition="indexCtrl.savingEdit"></gb-overlay>',
       '<h4>Edit text</h4>',
@@ -231,6 +231,17 @@ var POST_TEMPLATE = [
       '<br>',
       '<button type="submit">Save</button>',
     '</form>',
+    '<div ng-if="postCtrl.edits.length > 0" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+      '<h4>History</h4>',
+      '<div ng-repeat="edit in postCtrl.edits | orderBy:\'timestamp\':true" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+        '<strong>Edited on {{edit.timestamp | date:"medium"}}</strong>',
+        '<p>{{edit.text}}</p>',
+      '</div>',
+      '<div style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+        '<strong>Original post from {{postCtrl.post.timestamp | date:"medium"}}</strong>',
+        '<p>{{postCtrl.post.text}}</p>',
+      '</div>',
+    '</div>',
     '<form ng-submit="postCtrl.submitAnswer()" ng-if="ctrl.auth" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
       '<gb-overlay condition="postCtrl.submittingAnswer"></gb-overlay>',
       '<h4>Answer</h4>',
