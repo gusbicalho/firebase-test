@@ -57,8 +57,8 @@ gulp.task('dev', ['watch'], function() {
   var server = express();
   server.use(express.static('./dist'));
   // Redirects everything back to index.html
-  server.all('/'+serverRoot+'/*', function(req, res) {
-      res.sendFile(serverRoot+'/index.html', { root: serverRoot });
+  server.all('/*', function(req, res) {
+      res.sendFile('/index.html', { root: serverRoot });
   });
   // Start webserver
   server.listen(serverport);

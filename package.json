@@ -13,6 +13,7 @@
     "angular-ui-router": "^0.2.14",
     "angularfire": "^1.0.0",
     "express": "^4.12.3",
+    "gb-overlay": "^1.0.2",
     "lodash": "^3.7.0"
   },
   "devDependencies": {

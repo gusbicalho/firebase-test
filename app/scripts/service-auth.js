@@ -11,9 +11,18 @@ function AuthFactory(FirebaseRef, $firebaseAuth, $firebaseObject, $state, $rootS
   auth.$onAuth(onAuth);
   
   return {
-    get user() { return user; },
-    get requireAuth() { return function() { return auth.requireAuth(); }; },
-    get waitForAuth() { return function() { return auth.waitForAuth(); }; },
+    get getUser() {
+      return function() {
+        return auth.$waitForAuth()
+          .then(function(authData) {
+            if (!authData)
+              return null;
+            return $firebaseObject(FirebaseRef.child('accounts').child(authData.uid)).$loaded();
+          });
+      };
+    },
+    get requireAuth() { return function() { return auth.$requireAuth(); }; },
+    get waitForAuth() { return function() { return auth.$waitForAuth(); }; },
     get onAuth() { return function(fn) { return auth.$onAuth(fn); }; },
     get loginFacebook() { return loginFB; },
     get loginPassword() { return loginPassword; },
@@ -50,6 +59,7 @@ function AuthFactory(FirebaseRef, $firebaseAuth, $firebaseObject, $state, $rootS
   }
 
   function onAuth(authData) {
+    console.log('auth onAuth');
     if (user)
       user.finally(function(userObj) {
         if (userObj) userObj.$destroy();

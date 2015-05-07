@@ -18,6 +18,10 @@ angular.module('gb.FirebaseTest', [
 
 require('./service-auth');
 require('./states-email');
+require('./states-user');
+require('./states-authdata');
+require('./states-messages');
+require('./states-board');
 
 var _ = require('lodash');
 
@@ -30,7 +34,9 @@ function config($urlProvider, $locationProvider, $stateProvider) {
   });
   $locationProvider.hashPrefix('!');
   $stateProvider
-    .state('index', {});
+    .state('index', {
+      url: ''
+    });
 }
 
 basicSetup.$inject = ['$rootScope','$state'];
@@ -41,11 +47,11 @@ function basicSetup($rootScope, $state) {
 }
 
 function FirebaseRefFactory(Firebase) {
-  return new Firebase('https://burning-torch-5101.firebaseio.com/');
+  return new Firebase('https://burning-torch-5101.firebaseio.com/test1');
 }
 
 function AppController($scope, $state, FirebaseRef, $firebaseObject, Auth) {
-  var AppCtrl = this, userUnbind;
+  var AppCtrl = this;
 
   AppCtrl.emailLogin = function() { $state.go('emailLogin'); };
   AppCtrl.emailSignup = function() { $state.go('emailSignup'); };
@@ -53,7 +59,7 @@ function AppController($scope, $state, FirebaseRef, $firebaseObject, Auth) {
   AppCtrl.logout = function() { Auth.logout(); };
 
   Auth.onAuth(onAuth);
-
+  
   function loginFB() {
     Auth.loginFacebook().catch(function(reason) {
         alert(reason.message);
@@ -62,22 +68,6 @@ function AppController($scope, $state, FirebaseRef, $firebaseObject, Auth) {
   }
   function onAuth(authData) {
     AppCtrl.authData = authData;
-    Auth.user
-      .then(function(userObj) {
-        if (userUnbind) {
-          userUnbind();
-          userUnbind = null;
-        }
-        if (!userObj) {
-          delete AppCtrl.msgsRef;
-          return (AppCtrl.user = null);
-        }
-        AppCtrl.msgsRef = userObj.$ref().child('messages').toString();
-        return userObj.$bindTo($scope, 'AppCtrl.user');
-      })
-      .then(function(unbind) {
-        userUnbind = unbind;
-      });
   }
 }
 
