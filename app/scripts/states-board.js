@@ -38,6 +38,7 @@ function configStates($stateProvider) {
 function BoardController(Auth, authData, $state) {
   var ctrl = this;
 
+  ctrl.auth = authData;
   var offAuth = Auth.onAuth(function(newAuthData) {
     if ((!!newAuthData !== !!authData) ||
         (newAuthData && authData && newAuthData.uid !== authData.uid)) {
@@ -148,7 +149,7 @@ function PostController(Firebase, FirebaseRef, authData, $scope, $q, $state) {
     $scope.$applyAsync(function() {
       var post = data.val();
       post.currentContent =
-        !post.edits? post.text:
+        !post.edits? {text: post.text}:
         _.keys(post.edits).length === 0? post.text:
           _(post.edits).values().max('timestamp');
       postCtrl.post = post;
@@ -189,7 +190,7 @@ var BOARD_TEMPLATE = [
 
 var INDEX_TEMPLATE = [
   '<h3>Root</h3>',
-  '<form ng-submit="indexCtrl.submitNew()" ng-if="User" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
+  '<form ng-submit="indexCtrl.submitNew()" ng-if="ctrl.auth" style="position:relative;margin:0.5em;padding:0.5em;border:1px dotted #AAA">',
     '<gb-overlay condition="indexCtrl.submittingNew"></gb-overlay>',
     '<h4>New post</h4>',
     'Title: <input ng-model="indexCtrl.newPost.title"><br>',
@@ -210,12 +211,12 @@ var POST_TEMPLATE = [
   '<div ng-if="postCtrl.postLoaded">',
     '<h3>',
       '{{postCtrl.post.title}} ',
-      '<small ng-if="postCtrl.parent"><a ui-sref="board.post({postId:post.parent})">Go to Parent</a> </small>',
-      '<small>by {{postCtrl.post.author}}</small>',
+      '<small>by {{postCtrl.post.author}}</small> ',
+      '<small ng-if="postCtrl.post.parent"><a ui-sref="board.post({postId:postCtrl.post.parent})">Go to Parent</a></small>',
     '</h3>',
     '<div class="post-date" style="font-style:italic">',
       'Posted on {{postCtrl.post.timestamp | date:"medium"}}',
-      '<span ng-if="postCtrl.post.timestamp != postCtrl.post.currentContent.timestamp">',
+      '<span ng-if="postCtrl.post.currentContent.timestamp">',
         ', last edit on {{postCtrl.post.currentContent.timestamp | date:"medium"}}',
       '</span>',
     '</div>',
