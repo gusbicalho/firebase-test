@@ -59,10 +59,11 @@ function Controller(FirebaseRef, Auth, User, UserProfile, authData, $state, $sco
   });
   
   function saveUsername() {
+    var username = ctrl.newUsername.trim(), oldUsername = UserProfile?UserProfile.username:null, operation;
+    if (!username)
+      return;
     $scope.$applyAsync(function(){ctrl.savingUsername = true;});
-    var username = ctrl.newUsername.trim(), oldUsername = User.public?User.public.username:null, operation;
-    if (!username) username = null;
-    $q(username ? claimNewUsername : function(res){res(null);})
+    $q(claimNewUsername)
     .then(function(claimedRef) {
       return $q(setNewUsername.bind(null,claimedRef))
               .catch(function(setError) { // error setting username
