@@ -49,10 +49,10 @@ function BoardController(FirebaseRef, Auth, authData, $state, $q) {
     }
   });
   
-  function submitPost(post, before, success, error, after) {
+  function submitPost(post, scope, before, success, error, after, context) {
     if (!authData) return;
     console.log('submitPost',post);
-    before();
+    apply(before.bind(context));
     post = _.cloneDeep(post);
     post.author = authData.uid;
     post.timestamp = Firebase.ServerValue.TIMESTAMP;
@@ -63,14 +63,21 @@ function BoardController(FirebaseRef, Auth, authData, $state, $q) {
       });
     })
     .then(function(newPostRef) {
-      success(newPostRef);
+      apply(success.bind(context,newPostRef));
     })
     .catch(function(reason) {
-      error(reason);
+      apply(error.bind(context,reason));
     })
     .finally(function() {
-      after();
+      apply(after.bind(context));
     });
+    
+    function apply(fn) {
+      if (scope)
+        scope.$applyAsync(fn);
+      else
+        fn();
+    }
   }
 }
 
@@ -87,7 +94,7 @@ function IndexController(Firebase, FirebaseRef, authData, $firebaseArray, $scope
 
   function submitNew(parent) {
     if (indexCtrl.submittingNew) return;
-    $scope.ctrl.submitPost(indexCtrl.newPost,
+    $scope.ctrl.submitPost(indexCtrl.newPost, $scope,
       function() { // before
         indexCtrl.submittingNew = true;
       },
@@ -167,7 +174,7 @@ function PostController(Firebase, FirebaseRef, authData, $firebaseArray, $scope,
   function submitAnswer() {
     if (!postCtrl.postLoaded || postCtrl.submittingAnswer) return;
     postCtrl.newAnswer.parent = postCtrl.post.key;
-    $scope.ctrl.submitPost(postCtrl.newAnswer,
+    $scope.ctrl.submitPost(postCtrl.newAnswer, $scope,
       function() { // before
         postCtrl.submittingAnswer = true;
       },
