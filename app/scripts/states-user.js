@@ -13,13 +13,25 @@ function configStates($stateProvider) {
         User: function(Auth) {
           return Auth.getUser();
         },
+        UserProfile: function(FirebaseRef, Auth, $firebaseObject) {
+          return Auth.waitForAuth()
+                  .then(function(authData) {
+                    if (!authData) return null;
+                    return $firebaseObject(
+                            FirebaseRef.child('profiles')
+                                       .child(authData.uid)
+                           ).$loaded();
+                  })
+        },
         authData: function(Auth) {
           return Auth.waitForAuth();
         }
       },
-      onExit: function(User) {
+      onExit: function(User, UserProfile) {
         if (User)
           User.$destroy();
+        if (UserProfile)
+          UserProfile.$destroy();
       },
       controller: Controller,
       controllerAs: 'ctrl'
@@ -27,7 +39,7 @@ function configStates($stateProvider) {
     ;
 }
 
-function Controller(FirebaseRef, Auth, User, authData, $state, $scope, $q) {
+function Controller(FirebaseRef, Auth, User, UserProfile, authData, $state, $scope, $q) {
   var ctrl = this;
 
   ctrl.auth = authData;
@@ -35,6 +47,8 @@ function Controller(FirebaseRef, Auth, User, authData, $state, $scope, $q) {
   ctrl.saveUsername = saveUsername;
   if (User)
     User.$bindTo($scope, 'ctrl.user');
+  if (UserProfile)
+    UserProfile.$bindTo($scope, 'ctrl.userProfile');
   
   var offAuth = Auth.onAuth(function(newAuthData) {
     if ((!!newAuthData !== !!authData) ||
@@ -46,7 +60,7 @@ function Controller(FirebaseRef, Auth, User, authData, $state, $scope, $q) {
   
   function saveUsername() {
     $scope.$applyAsync(function(){ctrl.savingUsername = true;});
-    var username = ctrl.newUsername.trim(), oldUsername = User.username, operation;
+    var username = ctrl.newUsername.trim(), oldUsername = User.public?User.public.username:null, operation;
     if (!username) username = null;
     $q(username ? claimNewUsername : function(res){res(null);})
     .then(function(claimedRef) {
@@ -83,7 +97,8 @@ function Controller(FirebaseRef, Auth, User, authData, $state, $scope, $q) {
       })
     }
     function setNewUsername(result, res, rej) {
-      User.$ref().child('username')
+      FirebaseRef.child('profiles')
+        .child(authData.uid).child('username')
         .set(username, function(error) {
           if (error) return rej({step: 'set', error: error}); res(result);
         })
@@ -113,5 +128,6 @@ var TEMPLATE = [
     'Change username: <input ng-model="ctrl.newUsername">',
     '<button type="submit">Change</button>',
   '</form>',
-  '<pre>{{ctrl.user | prettyJSON}}</pre>'
+  '<pre>Account: {{ctrl.user | prettyJSON}}</pre>',
+  '<pre>Profile: {{ctrl.userProfile | prettyJSON}}</pre>',
   ].join('');
