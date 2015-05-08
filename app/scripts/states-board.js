@@ -35,11 +35,17 @@ function configStates($stateProvider) {
     ;
 }
 
-function BoardController(FirebaseRef, Auth, authData, $state, $q) {
+function BoardController(FirebaseRef, Auth, authData, $firebaseObject, $state, $q, $scope) {
   var ctrl = this;
 
   ctrl.auth = authData;
   ctrl.submitPost = submitPost;
+  ctrl.getUserProfile = getUserProfile;
+  ctrl.getUsername = getUsername;
+  var userProfiles = {};
+  $scope.$on('$destroy', _.each.bind(_,userProfiles,function(userObj) {
+    userObj.$destroy();
+  }));
 
   var offAuth = Auth.onAuth(function(newAuthData) {
     if ((!!newAuthData !== !!authData) ||
@@ -78,6 +84,16 @@ function BoardController(FirebaseRef, Auth, authData, $state, $q) {
       else
         fn();
     }
+  }
+
+  function getUserProfile(userId) {
+    if (!userProfiles[userId])
+      userProfiles[userId] = $firebaseObject(FirebaseRef.child('profiles').child(userId));
+    return userProfiles[userId];
+  }
+  function getUsername(userId) {
+    var profile = getUserProfile(userId);
+    return profile && profile.username ? profile.username : userId;
   }
 }
 
@@ -212,7 +228,7 @@ var INDEX_TEMPLATE = [
   '<h4>Posts</h4>',
   '<ul>',
     '<li ng-repeat="post in indexCtrl.boardPosts">',
-        '<a ui-sref="board.post({postId:post.$id})">@{{post.author}}: {{post.title}}</a>',
+      '<a ui-sref="board.post({postId:post.$id})">@{{ctrl.getUsername(post.author)}}: {{post.title}}</a>',
     '</li>',
   '</ul>',
   ].join('');
@@ -221,7 +237,7 @@ var POST_TEMPLATE = [
   '<div ng-if="postCtrl.postLoaded">',
     '<h3>',
       '{{postCtrl.post.title}} ',
-      '<small>by {{postCtrl.post.author}}</small> ',
+      '<small>by {{ctrl.getUsername(postCtrl.post.author)}}</small> ',
       '<small ng-if="postCtrl.post.parent"><a ui-sref="board.post({postId:postCtrl.post.parent})">Go to Parent</a></small>',
     '</h3>',
     '<div class="post-date" style="font-style:italic">',
@@ -261,7 +277,7 @@ var POST_TEMPLATE = [
     '<h4>Answers</h4>',
     '<ul>',
       '<li ng-repeat="post in postCtrl.answers">',
-        '<a ui-sref="board.post({postId:post.$id})">@{{post.author}}: {{post.title}}</a>',
+        '<a ui-sref="board.post({postId:post.$id})">@{{ctrl.getUsername(post.author)}}: {{post.title}}</a>',
       '</li>',
     '</ul>',
   '</div>',
