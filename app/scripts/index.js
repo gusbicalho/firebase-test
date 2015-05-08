@@ -23,6 +23,7 @@ require('./states-user');
 require('./states-authdata');
 require('./states-messages');
 require('./states-board');
+require('./states-userlist');
 
 var _ = require('lodash');
 
