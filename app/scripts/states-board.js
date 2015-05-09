@@ -5,9 +5,11 @@ angular.module('gb.FirebaseTest')
 
 var _ = require('lodash');
 
-function configStates($stateProvider) {
+function configStates($stateProvider, $urlRouterProvider) {
+  $urlRouterProvider.when('/board', '/board/index');
   $stateProvider
     .state('board', {
+      abstract: true,
       url: '/board',
       template: BOARD_TEMPLATE,
       resolve: {
@@ -19,14 +21,14 @@ function configStates($stateProvider) {
       controllerAs: 'ctrl'
     })
     .state('board.index', {
-      url: '',
+      url: '/index',
       template: INDEX_TEMPLATE,
       resolve: {},
       controller: IndexController,
       controllerAs: 'indexCtrl'
     })
     .state('board.post', {
-      url: '/:postId',
+      url: '/post/:postId',
       template: POST_TEMPLATE,
       resolve: {},
       controller: PostController,
